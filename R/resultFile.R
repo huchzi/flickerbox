@@ -12,19 +12,19 @@
 #' @export
 
 resultFile <- function(name, presets = flickerbox::presets) {
-
+  
   # Define constants
   modulation <- 1:4
   phase <- 5:8
   zero <- rep(0, 4)
   treatNA = "keep"
-
+  
   # read the resultFile into a table, shared with photoreceptorCoordinates.R
   rt <- read.resultFile(name)
-
+  
   # Read contrasts
   kontraste <- rt[rt$category == "Delta Kontrast SC1", 3:10]
-
+  
   if (sum(kontraste[1:4]) == 0)
   {
     kontraste <- kontraste[5:8]
@@ -33,38 +33,55 @@ resultFile <- function(name, presets = flickerbox::presets) {
   {
     kontraste <- kontraste[1:4]
   }
-
+  
   Kontrast100 <- which.max(rt[rt$category == "Kontrast SC1",])
-
+  
   # Determine frequency
-
+  
   freq <- rt[which(grepl("Frequenz", rt[, 1])),
              which.max(rt[rt$category == "Kontrast SC1",])]
-
+  
   # Determine photoreceptor type
-
+  
   for (rtypes in names(presets)[-1]) {
     if (sum(abs(presets[modulation, rtypes] - kontraste)) < .1) {
       type <- rtypes
     }
   }
-
+  
   if (is.na(type)) {
     warning("Cannot determine photoreceptor type.")
   }
-
+  
   # Determine LED contrasts at threshold
-
+  
   if (is.na(type)) {
     maxContrast <- NA
   } else {
     maxContrast <- presets[presets$X == "K", type]
   }
+  
+  # Determine the method used 
+  
+  method_finder <- which(grepl("Strategie", rt[,1]))
+  lenght_method_finder <- length(method_finder)
+  
+  if(lenght_method_finder!=0) {
+    set_Method <- "BP"
+  } else {
+    set_Method <- "SC"
+  }
 
-  thresholdsLED <-
-    rbind(D = rt[which(grepl("Down: Schwelle", rt[, 1])), 3:6],
-          U = rt[which(grepl("Up: Schwelle", rt[, 1])), 3:6])
-
+  if (set_Method == "SC"){
+    thresholdsLED <-
+      rbind(D = rt[which(grepl("Down: Schwelle", rt[, 1])), 3:6],
+            U = rt[which(grepl("Up: Schwelle", rt[, 1])), 3:6])
+  } else if (set_Method=="BP") {
+    thresholdsLED <-
+    rbind(D = rt[which(grepl("BestPEST: Schwelle", rt[, 1])), 3:6],
+          U = rt[which(grepl("BestPEST: Schwelle", rt[, 1])), 3:6])
+  }
+  
   if (nrow(thresholdsLED) == 0) {
     warning("No staircase terminated.")
     termination.status <- 0
@@ -78,15 +95,15 @@ resultFile <- function(name, presets = flickerbox::presets) {
   } else {
     termination.status <- nrow(thresholdsLED)
   }
-
+  
   thresholdsPR <-
     data.frame(thresholdsLED, apply(thresholdsLED, 1, max) * maxContrast / 100)
-
+  
   sensitivities <-
     data.frame(thresholdsPR,
                Sensitivity = 1 / thresholdsPR[, 5],
                term = termination.status)
-
+  
   names(sensitivities) <- c(
     "red",
     "green",
@@ -96,13 +113,16 @@ resultFile <- function(name, presets = flickerbox::presets) {
     paste("sensitivity:", type),
     "Term"
   )
-
+  
   notSeen <- rt$response == "nicht gesehen"
   seen <- rt$response == "gesehen"
-
+  
+  # add the psychometric table and parameters
+  PsiT <- psychometric_table(name)
+  
   # Create resultTab list
   resultTab <- list()
-
+  
   resultTab$name <- name
   resultTab$table <- rt
   resultTab$type <- type
@@ -114,10 +134,11 @@ resultFile <- function(name, presets = flickerbox::presets) {
   resultTab$thresholdsPR <- thresholdsPR
   resultTab$terminationStatus <- termination.status
   resultTab$Kontrast100 <- Kontrast100
-
+  resultTab$PsychometricTable <- PsiT
+  
   resultTab$sensitivity <-
     ifelse (is.na(type), NA, mean(sensitivities[, 6]))
-
+  
   if (length(na.omit(rt$response)) == 0)
   {
     resultTab$numberOfQuestions <- 0
@@ -126,9 +147,9 @@ resultFile <- function(name, presets = flickerbox::presets) {
   {
     resultTab$numberOfQuestions <- sum(seen) + sum(notSeen)
   }
-
+  
   class(resultTab) <- append(class(resultTab), "resultFile")
-
+  
   return(resultTab)
 }
 
