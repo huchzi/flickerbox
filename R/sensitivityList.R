@@ -20,9 +20,9 @@ sensitivityList.default <- function(x) {
 #' @export
 sensitivityList.character <- function(path = ".") {
 
-  path %>%
-    resultList() %>%
-    sensitivityList()
+  resultList(
+    sensitivityList(path)
+  )
 
 }
 
@@ -30,9 +30,11 @@ sensitivityList.character <- function(path = ".") {
 #' @param resultList an object of class resultList
 #' @export
 #' @examples
+#' \dontrun{
 #' rl <- resultList(".")
 #' sl <- sensitivityList(rl)
 #' print(sl)
+#' }
 sensitivityList.resultList <- function(resultList) {
 
   tab <- lapply(resultList, function (x) { data.frame(basics = getBasics(x),
